@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>沉浸式英语训练 | Dictation & Translation</title>
+    <title> 英语进阶 | Dictation & Translation</title>
     <!-- 引入 Diff 库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
     <!-- 引入 XLSX 库 -->
@@ -416,14 +416,31 @@
         }
     }
 
+    // =======================================================
+    // 关键修改：修正 PDF 路径逻辑
+    // =======================================================
     function openPdfModal() {
         if (!currentTrans) return alert("请先选择语料。");
 
-        const pdfData = currentTrans.pdfBase64 || currentTrans.pdf;
-        if (!pdfData) return alert("该语料未配置 PDF。");
+        // 1. 优先尝试从 data.json 读取 'pdf' 字段
+        // 2. 如果没有，则尝试使用 'files/' + 标题 + '.pdf' 的方式拼接
+        // 注意：这里使用了 encodeURIComponent 来处理中文文件名
+        let pdfPath = "";
+        
+        if (currentTrans.pdf) {
+             // 如果 JSON 里写了 "pdf": "files/abc.pdf" 或 "pdf": "http..."
+             pdfPath = currentTrans.pdf;
+        } else {
+             // 如果 JSON 里没写 pdf 路径，我们默认去 files 文件夹找同名文件
+             // 例如标题是 "Lesson1"，则去找 "files/Lesson1.pdf"
+             pdfPath = "files/" + currentTrans.title + ".pdf";
+        }
 
-        document.getElementById('pdf-iframe').src = pdfData;
-        document.getElementById('pdf-download-link').href = pdfData;
+        // 调试：在控制台打印路径，如果还打不开，按 F12 看 Console 里的这个路径对不对
+        console.log("正在尝试打开 PDF:", pdfPath);
+
+        document.getElementById('pdf-iframe').src = pdfPath;
+        document.getElementById('pdf-download-link').href = pdfPath;
         document.getElementById('pdfModal').style.display = 'block';
         document.body.style.overflow = 'hidden';
     }
