@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>沉浸式英语训练 | Dictation & Translation</title>
+    <!-- 引入 Diff 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <!-- 引入 XLSX 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* --- 基础设置 & 响应式适配 --- */
+        :root {
+            --primary: #4f46e5; /* 学习蓝 */
+            --primary-hover: #4338ca;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --error: #ef4444;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* --- 头部 & 导航 --- */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 { font-size: 1.8rem; color: var(--text-main); margin-bottom: 10px; }
+        
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            background: #e5e7eb;
+            padding: 5px;
+            border-radius: 50px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .nav-tabs button {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 45px;
+            font-weight: 600;
+            color: var(--text-sub);
+            transition: all 0.3s ease;
+        }
+        .nav-tabs button.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* --- 通用卡片样式 --- */
+        .section { display: none; animation: fadeIn 0.3s ease; }
+        .section.active { display: block; }
+        
+        .control-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        /* --- 表单控件 --- */
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px; /* 防止手机端自动放大 */
+            box-sizing: border-box;
+            font-family: inherit;
+            resize: vertical;
+        }
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* --- 按钮样式 --- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: var(--primary); color: white; width: 100%; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-check { background: var(--text-main); color: white; margin-top: 10px; width: auto; padding: 8px 16px; font-size: 0.9rem;}
+        
+        /* 手机端按钮适配 */
+        @media (max-width: 600px) {
+            .btn-group { flex-direction: column; gap: 10px; }
+            .btn { width: 100%; }
+        }
+
+        /* --- 听写 & 翻译特定 --- */
+        .audio-player { width: 100%; margin: 10px 0; height: 40px; }
+        
+        .diff-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            font-size: 0.95rem;
+        }
+        .diff-del { background-color: #fee2e2; text-decoration: line-through; color: #991b1b; }
+        .diff-ins { background-color: #dcfce7; color: #166534; font-weight: bold; }
+        
+        .analysis-tag {
+            display: inline-block;
+            background: #fff7ed;
+            color: #c2410c;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            border: 1px solid #ffedd5;
+        }
+
+        /* --- PDF 模态框 --- */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.5); 
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 2% auto; 
+            padding: 0;
+            border-radius: 12px;
+            width: 90%; 
+            max-width: 1000px;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close-modal { font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
+        .pdf-frame { flex: 1; border: none; width: 100%; height: 100%; }
+
+        /* 动画 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>📚 英文精进工具箱</h1>
+        <div class="nav-tabs">
+            <button onclick="switchTab('dictation')" id="btn-dictation" class="active">🎧 听写训练</button>
+            <button onclick="switchTab('translation')" id="btn-translation">🔁 回译训练</button>
+        </div>
+    </header>
+
+    <!-- ================= 听写模块 ================= -->
+    <div id="dictation" class="section active">
+        <div class="control-panel">
+            <label style="font-weight:bold; display:block; margin-bottom:8px;">选择课程</label>
+            <select id="dictation-select" onchange="loadDictationLesson()">
+                <option value="">-- 请选择听写材料 --</option>
+            </select>
+        </div>
+
+        <div id="dictation-workspace" style="display:none;">
+            <!-- 完整音频播放器 -->
+            <div class="card" style="text-align: center; background: #e0e7ff; border:none;">
+                <h3 style="margin:0 0 10px 0; color: var(--primary);">Step 1: 完整磨耳朵</h3>
+                <audio id="full-audio" controls class="audio-player"></audio>
+            </div>
+
+            <!-- 句子列表 -->
+            <div id="sentence-container"></div>
+            
+            <!-- 底部导出 -->
+            <div style="margin-top: 30px; text-align: center;">
+                <button class="btn btn-primary" onclick="exportDictationExcel()" style="padding: 15px 30px; font-size: 1.1rem;">
+                    📊 完成练习并导出报告
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 回译模块 ================= -->
+    <div id="translation" class="section">
+        <div class="control-panel">
+            <label style="font-weight:bold; display:block; margin-bottom:8px;">选择语料</label>
+            <select id="trans-select" onchange="loadTransLesson()">
+                <option value="">-- 请选择回译材料 --</option>
+            </select>
+            
+            <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <!-- 顺序选择 -->
+                <div style="display: flex; gap: 15px;">
+                    <label style="cursor:pointer; display:flex; align-items:center;">
+                        <input type="radio" name="order" value="seq" checked> 顺序练习
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center;">
+                        <input type="radio" name="order" value="random"> 乱序练习
+                    </label>
+                </div>
+                
+                <div style="flex:1; text-align: right; min-width: 200px;">
+                    <button class="btn btn-secondary" onclick="openPdfModal()">📄 查看原文 PDF</button>
+                    <button class="btn btn-primary" onclick="startTransPractice()" style="width: auto; margin-left: 10px;">🚀 开始练习</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="trans-workspace" style="display:none;">
+            <div id="trans-cards"></div>
+             <div style="margin-top: 30px; text-align: center;">
+                <button class="btn btn-primary" onclick="exportTransExcel()" style="padding: 15px 30px; font-size: 1.1rem;">
+                    📊 完成练习并导出报告
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF 模态框 -->
+<div id="pdfModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span style="font-weight:bold; font-size:1.1rem;">原文预览</span>
+            <span class="close-modal" onclick="closePdfModal()">&times;</span>
+        </div>
+        <iframe id="pdf-iframe" class="pdf-frame" src=""></iframe>
+        <div style="padding:10px; text-align:center; background:#f9f9f9; font-size:0.9rem; color:#666;">
+            如果无法预览，请 <a id="pdf-download-link" href="#" target="_blank">点击这里下载/打开 PDF</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 数据与状态 ---
+    let appData = {};
+    let currentDictation = null;
+    let currentTrans = null;
+    let userDictationInputs = {};
+    let userTransInputs = {};
+
+    // --- 初始化 ---
+    window.onload = async function() {
+        try {
+            // 如果你使用外部 data.json, 请取消下面两行注释
+            // const response = await fetch('data.json');
+            // appData = await response.json();
+
+            // --- 已嵌入新的 Absurdism 数据 ---
+            appData = {
+              "dictation": [
+                {
+                  "id": 1,
+                  "title": "Absurdism: Why Life Is Meaningless According to Absurdists",
+                  "fullAudio": "audio/absurdism_full.mp3",
+                  "sentences": [
+                    { "id": 1, "audio": "audio/absurdism_s1.mp3", "en": "The A to Z of-isms. Absurdism.", "cn": "从 A 到 Z 的主义.荒诞主义." },
+                    { "id": 2, "audio": "audio/absurdism_s2.mp3", "en": "Most philosophical-isms are attempts to make sense of the world.", "cn": "⼤多数哲学主义都在试图理解这个世界." },
+                    { "id": 3, "audio": "audio/absurdism_s3.mp3", "en": "Who are we? Why are we? What's the point? And so on.", "cn": "我们是谁？为什么是我们？有什么意义？等等诸如此类." },
+                    { "id": 4, "audio": "audio/absurdism_s4.mp3", "en": "But one-ism wastes no time on this topic at all. It's called absurdism.", "cn": "但是,有⼀个哲学主义在这个问题上⼀点时间也不浪费.它叫做荒诞主义." },
+                    { "id": 5, "audio": "audio/absurdism_s5.mp3", "en": "In answer to the question, \"What is the meaning of life?\" Absurdism says, there isn't any. No meaning. No point. No worries.", "cn": "在回答\"⽣命的意义是什么？\"这个问题时.荒诞主义会表示,什么都没有.没有什么意义.没有什么重点.没什么好担⼼的." },
+                    { "id": 6, "audio": "audio/absurdism_s6.mp3", "en": "Life is pointless. Existence is meaningless, and look how many peas I have in this pan.", "cn": "⽣活是没有意义的.存在是没有⽬的的,看看在这个锅⾥我有多少豌⾖." },
+                    { "id": 7, "audio": "audio/absurdism_s7.mp3", "en": "Absurdism was pioneered by the Danish philosopher, Soren Kierkegaard, who said that, \"As the reality of God is beyond human comprehension, it is absurd for humans to have faith in God.\"", "cn": "荒诞主义的开创者,丹⻨哲学家索伦·克尔凯郭尔说,\"鉴于上帝的真实性已经超出了⼈类的理解,那么于⼈类⽽⾔信仰上帝简直是荒谬.\"" },
+                    { "id": 8, "audio": "audio/absurdism_s8.mp3", "en": "In the 20th Century, absurdists removed the concept of God entirely from the equation, choosing to make meaning and meaninglessness an entirely human issue.", "cn": "早在20世纪,荒谬主义者将上帝的概念完全从等式中移除,选择将意义和⽆意义完全变成⼈类的问题." },
+                    { "id": 9, "audio": "audio/absurdism_s9.mp3", "en": "Albert Camus believed that, as life is meaningless, we can have one of two responses.", "cn": "阿尔⻉·加缪认为,由于⽣命是没有意义的,我们可以有以下两种反应中的⼀种." },
+                    { "id": 10, "audio": "audio/absurdism_s10.mp3", "en": "We can end it all or we can find our own meaning. It doesn't matter.", "cn": "我们可以结束这⼀切,也可以找到⾃⼰的意义.这都⽆所谓." },
+                    { "id": 11, "audio": "audio/absurdism_s11.mp3", "en": "You can, as one of his characters does, spend your life transferring peas from one pan to another. Or you can jump off a bridge. It's all the same thing.", "cn": "你可以像他笔下的⼀个⻆⾊那样,⼀辈⼦的时间都⽤来把豌⾖从⼀个锅⾥转移到另⼀个锅⾥.或者你可以从⼀座桥上跳下去.都没什么差别." },
+                    { "id": 12, "audio": "audio/absurdism_s12.mp3", "en": "Life is absurd, say the absurdists.", "cn": "荒诞主义者说,⽣活是荒谬的." },
+                    { "id": 13, "audio": "audio/absurdism_s13.mp3", "en": "There is no God, so there is no point.", "cn": "没有上帝,所以没有意义." },
+                    { "id": 14, "audio": "audio/absurdism_s14.mp3", "en": "But they go on to say, \"that's fine.\"", "cn": "但他们接着会说,\"没关系\"." },
+                    { "id": 15, "audio": "audio/absurdism_s15.mp3", "en": "Absurdism is an-ism whose influence has been strong in the arts.", "cn": "荒诞主义是对艺术⼀直都有很强影响的⼀种主义." },
+                    { "id": 16, "audio": "audio/absurdism_s16.mp3", "en": "The idea that nothing has meaning is a liberating one, particularly in areas like literature and drama which have traditionally been all about the search for meaning.", "cn": "\"没有什么是有意义的\"这⼀观点是⼀种思想解放,尤其是在⽂学和戏剧等传统上都是关于寻找意义的领域." },
+                    { "id": 17, "audio": "audio/absurdism_s17.mp3", "en": "Most notably, absurdism spawned the Theatre of the Absurd, probably the only theatrical movement inspired by philosophy.", "cn": "最值得注意的是,荒诞主义催⽣了\"荒诞派戏剧\",这可能是唯⼀受到哲学启发的戏剧运动." },
+                    { "id": 18, "audio": "audio/absurdism_s18.mp3", "en": "The Theatre of the Absurd gave us the French writer, Eugène Ionesco, whose play Rhinoceros was about the dangers of conformity and featured a lot of rhinoceroses.", "cn": "\"荒诞派戏剧\"让我们认识了法国作家欧仁·尤内斯库,他的戏剧《犀⽜》讲的是循规蹈矩的危险,其特点是⾥⾯有很多犀⽜." },
+                    { "id": 19, "audio": "audio/absurdism_s19.mp3", "en": "The Irish genius, Samuel Beckett, whose work is less rhinoceros-based, and the British writer NF Simpson, who wasn't really an absurdist at all but is very, very funny indeed, especially in his absurd masterpiece, A Resounding Tinkle.", "cn": "还让我们认识了爱尔兰天才塞缪尔·⻉克特,他的作品相⽐前⼀位没有那么以犀⽜为基础创作内核;以及英国作家纳夫·⾟普森,则根本就不是⼀个真正的荒谬主义者,但确实⾮常⾮常有趣,特别是在他的荒诞派代表作《响亮的叮当声》中显现的淋漓尽致." },
+                    { "id": 20, "audio": "audio/absurdism_s20.mp3", "en": "Beckett, by the way, could also be very serious, and as in Ionesco, the critic, Kenneth Tynan, famously once said, \"Once you have seen all of Ionesco's plays, you have seen one of them.\"", "cn": "顺便说⼀句,⻉克特也可以写⾮常严肃的⽂学作品,⽽在尤内斯库的作品中,评论家肯尼思·泰南曾有句名⾔：“⼀旦你看过尤内斯库所有的戏剧,你就会发现你只看了其中⼀部.”" },
+                    { "id": 21, "audio": "audio/absurdism_s21.mp3", "en": "Which is absurd, but true. Just like absurdism.", "cn": "这听起来很荒谬,但却是事实.就像荒诞主义⼀样." },
+                    { "id": 22, "audio": "audio/absurdism_s22.mp3", "en": "Absurdism suits comedy in fact because the best comedy is essentially absurdist—and perhaps this is why absurdism will never really go away.", "cn": "荒诞主义实际上很适合喜剧，因为最好的喜剧本质上就是荒诞的——或许这就是为什么荒诞主义永远不会真正消失的原因。" }
+                  ]
+                }
+              ],
+              "translation": [
+                {
+                  "id": 1,
+                  "title": "Absurdism: Why Life Is Meaningless According to Absurdists",
+                  "pdf": "files/absurdism_text.pdf",
+                  "pairs": [
+                    { "id": 1, "cn": "从 A 到 Z 的主义.荒诞主义.", "en": "The A to Z of-isms. Absurdism." },
+                    { "id": 2, "cn": "⼤多数哲学主义都在试图理解这个世界.", "en": "Most philosophical-isms are attempts to make sense of the world." },
+                    { "id": 3, "cn": "我们是谁？为什么是我们？有什么意义？等等诸如此类.", "en": "Who are we? Why are we? What's the point? And so on." },
+                    { "id": 4, "cn": "但是,有⼀个哲学主义在这个问题上⼀点时间也不浪费.它叫做荒诞主义.", "en": "But one-ism wastes no time on this topic at all. It's called absurdism." },
+                    { "id": 5, "cn": "在回答\"⽣命的意义是什么？\"这个问题时.荒诞主义会表示,什么都没有.没有什么意义.没有什么重点.没什么好担⼼的.", "en": "In answer to the question, \"What is the meaning of life?\" Absurdism says, there isn't any. No meaning. No point. No worries." },
+                    { "id": 6, "cn": "⽣活是没有意义的.存在是没有⽬的的,看看在这个锅⾥我有多少豌⾖.", "en": "Life is pointless. Existence is meaningless, and look how many peas I have in this pan." },
+                    { "id": 7, "cn": "荒诞主义的开创者,丹⻨哲学家索伦·克尔凯郭尔说,\"鉴于上帝的真实性已经超出了⼈类的理解,那么于⼈类⽽⾔信仰上帝简直是荒谬.\"", "en": "Absurdism was pioneered by the Danish philosopher, Soren Kierkegaard, who said that, \"As the reality of God is beyond human comprehension, it is absurd for humans to have faith in God.\"" },
+                    { "id": 8, "cn": "早在20世纪,荒谬主义者将上帝的概念完全从等式中移除,选择将意义和⽆意义完全变成⼈类的问题.", "en": "In the 20th Century, absurdists removed the concept of God entirely from the equation, choosing to make meaning and meaninglessness an entirely human issue." },
+                    { "id": 9, "cn": "阿尔⻉·加缪认为,由于⽣命是没有意义的,我们可以有以下两种反应中的⼀种.", "en": "Albert Camus believed that, as life is meaningless, we can have one of two responses." },
+                    { "id": 10, "cn": "我们可以结束这⼀切,也可以找到⾃⼰的意义.这都⽆所谓.", "en": "We can end it all or we can find our own meaning. It doesn't matter." },
+                    { "id": 11, "cn": "你可以像他笔下的⼀个⻆⾊那样,⼀辈⼦的时间都⽤来把豌⾖从⼀个锅⾥转移到另⼀个锅⾥.或者你可以从⼀座桥上跳下去.都没什么差别.", "en": "You can, as one of his characters does, spend your life transferring peas from one pan to another. Or you can jump off a bridge. It's all the same thing." },
+                    { "id": 12, "cn": "荒诞主义者说,⽣活是荒谬的.", "en": "Life is absurd, say the absurdists." },
+                    { "id": 13, "cn": "没有上帝,所以没有意义.", "en": "There is no God, so there is no point." },
+                    { "id": 14, "cn": "但他们接着会说,\"没关系\".", "en": "But they go on to say, \"that's fine.\"" },
+                    { "id": 15, "cn": "荒诞主义是对艺术⼀直都有很强影响的⼀种主义.", "en": "Absurdism is an-ism whose influence has been strong in the arts." },
+                    { "id": 16, "cn": "\"没有什么是有意义的\"这⼀观点是⼀种思想解放,尤其是在⽂学和戏剧等传统上都是关于寻找意义的领域.", "en": "The idea that nothing has meaning is a liberating one, particularly in areas like literature and drama which have traditionally been all about the search for meaning." },
+                    { "id": 17, "cn": "最值得注意的是,荒诞主义催⽣了\"荒诞派戏剧\",这可能是唯⼀受到哲学启发的戏剧运动.", "en": "Most notably, absurdism spawned the Theatre of the Absurd, probably the only theatrical movement inspired by philosophy." },
+                    { "id": 18, "cn": "\"荒诞派戏剧\"让我们认识了法国作家欧仁·尤内斯库,他的戏剧《犀⽜》讲的是循规蹈矩的危险,其特点是⾥⾯有很多犀⽜.", "en": "The Theatre of the Absurd gave us the French writer, Eugène Ionesco, whose play Rhinoceros was about the dangers of conformity and featured a lot of rhinoceroses." },
+                    { "id": 19, "cn": "还让我们认识了爱尔兰天才塞缪尔·⻉克特,他的作品相⽐前⼀位没有那么以犀⽜为基础创作内核;以及英国作家纳夫·⾟普森,则根本就不是⼀个真正的荒谬主义者,但确实⾮常⾮常有趣,特别是在他的荒诞派代表作《响亮的叮当声》中显现的淋漓尽致.", "en": "The Irish genius, Samuel Beckett, whose work is less rhinoceros-based, and the British writer NF Simpson, who wasn't really an absurdist at all but is very, very funny indeed, especially in his absurd masterpiece, A Resounding Tinkle." },
+                    { "id": 20, "cn": "顺便说⼀句,⻉克特也可以写⾮常严肃的⽂学作品,⽽在尤内斯库的作品中,评论家肯尼思·泰南曾有句名⾔：“⼀旦你看过尤内斯库所有的戏剧,你就会发现你只看了其中⼀部.”", "en": "Beckett, by the way, could also be very serious, and as in Ionesco, the critic, Kenneth Tynan, famously once said, \"Once you have seen all of Ionesco's plays, you have seen one of them.\"" },
+                    { "id": 21, "cn": "这听起来很荒谬,但却是事实.就像荒诞主义⼀样.", "en": "Which is absurd, but true. Just like absurdism." },
+                    { "id": 22, "cn": "荒诞主义实际上很适合喜剧，因为最好的喜剧本质上就是荒诞的——或许这就是为什么荒诞主义永远不会真正消失的原因。", "en": "Absurdism suits comedy in fact because the best comedy is essentially absurdist—and perhaps this is why absurdism will never really go away." }
+                  ]
+                }
+              ]
+            };
+            // ---------------------
+
+            initMenus();
+        } catch (e) {
+            console.error("Data loading failed:", e);
+            alert("数据加载失败，请检查数据格式或文件路径。");
+        }
+    };
+
+    function initMenus() {
+        const dSelect = document.getElementById('dictation-select');
+        appData.dictation.forEach((d, index) => dSelect.innerHTML += `<option value="${index}">${d.title}</option>`);
+        const tSelect = document.getElementById('trans-select');
+        appData.translation.forEach((t, index) => tSelect.innerHTML += `<option value="${index}">${t.title}</option>`);
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+        document.getElementById(tab).classList.add('active');
+        document.querySelectorAll('.nav-tabs button').forEach(el => el.classList.remove('active'));
+        document.getElementById('btn-' + tab).classList.add('active');
+    }
+
+    // --- 听写逻辑 ---
+    function loadDictationLesson() {
+        const index = document.getElementById('dictation-select').value;
+        if (index === "") {
+            document.getElementById('dictation-workspace').style.display = 'none';
+            return;
+        }
+        
+        currentDictation = appData.dictation[index];
+        document.getElementById('dictation-workspace').style.display = 'block';
+        document.getElementById('full-audio').src = currentDictation.fullAudio;
+        
+        const container = document.getElementById('sentence-container');
+        container.innerHTML = '';
+        userDictationInputs = {};
+
+        currentDictation.sentences.forEach((s, idx) => {
+            const html = `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span style="font-weight:bold; color:var(--text-sub);">Sentence ${idx + 1}</span>
+                    </div>
+                    <audio controls src="${s.audio}" class="audio-player"></audio>
+                    <textarea id="d-input-${idx}" rows="2" placeholder="听录音，写下句子..."></textarea>
+                    <div style="text-align:right;">
+                        <button class="btn btn-check" onclick="checkDictation(${idx})">✅ 提交检查</button>
+                    </div>
+                    <div id="d-result-${idx}" style="display:none;"></div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    function checkDictation(idx) {
+        const inputEl = document.getElementById(`d-input-${idx}`);
+        const input = inputEl.value.trim();
+        const original = currentDictation.sentences[idx].en;
+        const resultDiv = document.getElementById(`d-result-${idx}`);
+        
+        userDictationInputs[idx] = input; // 保存
+
+        if (!input) return alert("请先输入内容");
+
+        const dmp = new diff_match_patch();
+        const diffs = dmp.diff_main(input, original);
+        dmp.diff_cleanupSemantic(diffs);
+        
+        let html = '';
+        let hasError = false;
+        diffs.forEach(part => {
+            if (part[0] === 0) html += `<span>${part[1]}</span>`;
+            else if (part[0] === -1) { html += `<span class="diff-del">${part[1]}</span>`; hasError = true; }
+            else { html += `<span class="diff-ins">${part[1]}</span>`; hasError = true; }
+        });
+
+        let analysis = hasError ? "💡 提示：注意拼写或连读细节。" : "🎉 完美正确！";
+
+        resultDiv.innerHTML = `
+            <div class="diff-result">
+                <div style="margin-bottom:5px;"><strong>你的听写对比：</strong></div>
+                <div>${html}</div>
+                <div style="margin-top:10px; color:#666; font-size:0.9em;">原文：${original}</div>
+                <div style="color:#666; font-size:0.9em;">译文：${currentDictation.sentences[idx].cn}</div>
+                <div class="analysis-tag">${analysis}</div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+    }
+
+    function exportDictationExcel() {
+        if (!currentDictation) return;
+        const data = currentDictation.sentences.map((s, idx) => ({
+            "Index": idx + 1,
+            "Original Text": s.en,
+            "Chinese Meaning": s.cn,
+            "My Input": userDictationInputs[idx] || "(未填写)"
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Dictation Result");
+        XLSX.writeFile(wb, `Dictation_${currentDictation.title}.xlsx`);
+    }
+
+    // --- 回译逻辑 ---
+    function loadTransLesson() {
+        const index = document.getElementById('trans-select').value;
+        if (index !== "") {
+            currentTrans = appData.translation[index];
+            document.getElementById('trans-workspace').style.display = 'none';
+        } else {
+            currentTrans = null;
+        }
+    }
+
+    function openPdfModal() {
+        if (!currentTrans || !currentTrans.pdf) return alert("请先选择语料，或该语料未配置 PDF。");
+        document.getElementById('pdf-iframe').src = currentTrans.pdf;
+        document.getElementById('pdf-download-link').href = currentTrans.pdf;
+        document.getElementById('pdfModal').style.display = 'block';
+        document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    }
+
+    function closePdfModal() {
+        document.getElementById('pdfModal').style.display = 'none';
+        document.getElementById('pdf-iframe').src = "";
+        document.body.style.overflow = 'auto';
+    }
+
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        const modal = document.getElementById('pdfModal');
+        if (event.target == modal) closePdfModal();
+    }
+
+    function startTransPractice() {
+        if (!currentTrans) return alert("请先选择语料");
+        
+        const order = document.querySelector('input[name="order"]:checked').value;
+        let pairs = [...currentTrans.pairs];
+        if (order === 'random') pairs.sort(() => Math.random() - 0.5);
+
+        const container = document.getElementById('trans-cards');
+        container.innerHTML = '';
+        userTransInputs = {};
+        document.getElementById('trans-workspace').style.display = 'block';
+
+        pairs.forEach((p, index) => { // Added index here
+            const html = `
+                <div class="card">
+                    <div style="font-size:1.1rem; font-weight:bold; margin-bottom:10px;">${index + 1}. ${p.cn}</div> <!-- Added index + 1 -->
+                    <textarea id="t-input-${p.id}" rows="3" placeholder="请输入英文翻译..."></textarea>
+                    <div style="text-align:right;">
+                        <button class="btn btn-check" onclick="checkTranslation(${p.id}, '${p.en.replace(/'/g, "\\'")}')">✅ 提交检查</button>
+                    </div>
+                    <div id="t-result-${p.id}" style="display:none;"></div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    function checkTranslation(id, original) {
+        const inputEl = document.getElementById(`t-input-${id}`);
+        const input = inputEl.value.trim();
+        const resultDiv = document.getElementById(`t-result-${id}`);
+        
+        userTransInputs[id] = input;
+
+        const dmp = new diff_match_patch();
+        const diffs = dmp.diff_main(input, original);
+        dmp.diff_cleanupSemantic(diffs);
+        
+        let html = '';
+        diffs.forEach(part => {
+            if (part[0] === 0) html += `<span>${part[1]}</span>`;
+            else if (part[0] === -1) html += `<span class="diff-del">${part[1]}</span>`;
+            else html += `<span class="diff-ins">${part[1]}</span>`;
+        });
+
+        resultDiv.innerHTML = `
+            <div class="diff-result">
+                <div style="margin-bottom:5px;"><strong>批改结果：</strong></div>
+                <div>${html}</div>
+                <div style="margin-top:10px; color:#666;"><strong>参考答案：</strong> ${original}</div>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+    }
+
+    function exportTransExcel() {
+        if (!currentTrans) return;
+        const data = currentTrans.pairs.map(p => ({
+            "Chinese": p.cn,
+            "My Translation": userTransInputs[p.id] || "(未填写)",
+            "Correct Answer": p.en
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Translation Result");
+        XLSX.writeFile(wb, `Translation_${currentTrans.title}.xlsx`);
+    }
+</script>
+
+</body>
+</html>
