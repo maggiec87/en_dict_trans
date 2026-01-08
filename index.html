@@ -214,16 +214,11 @@
         </div>
 
         <div id="dictation-workspace" style="display:none;">
-            <!-- 完整音频播放器 -->
             <div class="card" style="text-align: center; background: #e0e7ff; border:none;">
                 <h3 style="margin:0 0 10px 0; color: var(--primary);">Step 1: 完整磨耳朵</h3>
                 <audio id="full-audio" controls class="audio-player"></audio>
             </div>
-
-            <!-- 句子列表 -->
             <div id="sentence-container"></div>
-            
-            <!-- 底部导出 -->
             <div style="margin-top: 30px; text-align: center;">
                 <button class="btn btn-primary" onclick="exportDictationExcel()" style="padding: 15px 30px; font-size: 1.1rem;">
                     📊 完成练习并导出报告
@@ -241,7 +236,6 @@
             </select>
             
             <div style="margin-top: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                <!-- 顺序选择 -->
                 <div style="display: flex; gap: 15px;">
                     <label style="cursor:pointer; display:flex; align-items:center;">
                         <input type="radio" name="order" value="seq" checked> 顺序练习
@@ -278,13 +272,14 @@
         </div>
         <iframe id="pdf-iframe" class="pdf-frame" src=""></iframe>
         <div style="padding:10px; text-align:center; background:#f9f9f9; font-size:0.9rem; color:#666;">
-            如果无法预览，请 <a id="pdf-download-link" href="#" target="_blank">点击这里下载/打开 PDF</a>
+            如果无法预览，请 <a id="pdf-download-link" href="#" target="_blank" download="original_text.pdf">点击这里下载 PDF</a>
         </div>
     </div>
 </div>
 
 <script>
     // --- 数据与状态 ---
+    // appData 将从外部文件加载，先声明为空对象
     let appData = {};
     let currentDictation = null;
     let currentTrans = null;
@@ -292,83 +287,23 @@
     let userTransInputs = {};
 
     // --- 初始化 ---
+    // 页面加载完成后，异步获取数据
     window.onload = async function() {
         try {
-            // 如果你使用外部 data.json, 请取消下面两行注释
-            // const response = await fetch('data.json');
-            // appData = await response.json();
-
-            // --- 已嵌入新的 Absurdism 数据 ---
-            appData = {
-              "dictation": [
-                {
-                  "id": 1,
-                  "title": "Absurdism: Why Life Is Meaningless According to Absurdists",
-                  "fullAudio": "audio/absurdism_full.mp3",
-                  "sentences": [
-                    { "id": 1, "audio": "audio/absurdism_s1.mp3", "en": "The A to Z of-isms. Absurdism.", "cn": "从 A 到 Z 的主义.荒诞主义." },
-                    { "id": 2, "audio": "audio/absurdism_s2.mp3", "en": "Most philosophical-isms are attempts to make sense of the world.", "cn": "⼤多数哲学主义都在试图理解这个世界." },
-                    { "id": 3, "audio": "audio/absurdism_s3.mp3", "en": "Who are we? Why are we? What's the point? And so on.", "cn": "我们是谁？为什么是我们？有什么意义？等等诸如此类." },
-                    { "id": 4, "audio": "audio/absurdism_s4.mp3", "en": "But one-ism wastes no time on this topic at all. It's called absurdism.", "cn": "但是,有⼀个哲学主义在这个问题上⼀点时间也不浪费.它叫做荒诞主义." },
-                    { "id": 5, "audio": "audio/absurdism_s5.mp3", "en": "In answer to the question, \"What is the meaning of life?\" Absurdism says, there isn't any. No meaning. No point. No worries.", "cn": "在回答\"⽣命的意义是什么？\"这个问题时.荒诞主义会表示,什么都没有.没有什么意义.没有什么重点.没什么好担⼼的." },
-                    { "id": 6, "audio": "audio/absurdism_s6.mp3", "en": "Life is pointless. Existence is meaningless, and look how many peas I have in this pan.", "cn": "⽣活是没有意义的.存在是没有⽬的的,看看在这个锅⾥我有多少豌⾖." },
-                    { "id": 7, "audio": "audio/absurdism_s7.mp3", "en": "Absurdism was pioneered by the Danish philosopher, Soren Kierkegaard, who said that, \"As the reality of God is beyond human comprehension, it is absurd for humans to have faith in God.\"", "cn": "荒诞主义的开创者,丹⻨哲学家索伦·克尔凯郭尔说,\"鉴于上帝的真实性已经超出了⼈类的理解,那么于⼈类⽽⾔信仰上帝简直是荒谬.\"" },
-                    { "id": 8, "audio": "audio/absurdism_s8.mp3", "en": "In the 20th Century, absurdists removed the concept of God entirely from the equation, choosing to make meaning and meaninglessness an entirely human issue.", "cn": "早在20世纪,荒谬主义者将上帝的概念完全从等式中移除,选择将意义和⽆意义完全变成⼈类的问题." },
-                    { "id": 9, "audio": "audio/absurdism_s9.mp3", "en": "Albert Camus believed that, as life is meaningless, we can have one of two responses.", "cn": "阿尔⻉·加缪认为,由于⽣命是没有意义的,我们可以有以下两种反应中的⼀种." },
-                    { "id": 10, "audio": "audio/absurdism_s10.mp3", "en": "We can end it all or we can find our own meaning. It doesn't matter.", "cn": "我们可以结束这⼀切,也可以找到⾃⼰的意义.这都⽆所谓." },
-                    { "id": 11, "audio": "audio/absurdism_s11.mp3", "en": "You can, as one of his characters does, spend your life transferring peas from one pan to another. Or you can jump off a bridge. It's all the same thing.", "cn": "你可以像他笔下的⼀个⻆⾊那样,⼀辈⼦的时间都⽤来把豌⾖从⼀个锅⾥转移到另⼀个锅⾥.或者你可以从⼀座桥上跳下去.都没什么差别." },
-                    { "id": 12, "audio": "audio/absurdism_s12.mp3", "en": "Life is absurd, say the absurdists.", "cn": "荒诞主义者说,⽣活是荒谬的." },
-                    { "id": 13, "audio": "audio/absurdism_s13.mp3", "en": "There is no God, so there is no point.", "cn": "没有上帝,所以没有意义." },
-                    { "id": 14, "audio": "audio/absurdism_s14.mp3", "en": "But they go on to say, \"that's fine.\"", "cn": "但他们接着会说,\"没关系\"." },
-                    { "id": 15, "audio": "audio/absurdism_s15.mp3", "en": "Absurdism is an-ism whose influence has been strong in the arts.", "cn": "荒诞主义是对艺术⼀直都有很强影响的⼀种主义." },
-                    { "id": 16, "audio": "audio/absurdism_s16.mp3", "en": "The idea that nothing has meaning is a liberating one, particularly in areas like literature and drama which have traditionally been all about the search for meaning.", "cn": "\"没有什么是有意义的\"这⼀观点是⼀种思想解放,尤其是在⽂学和戏剧等传统上都是关于寻找意义的领域." },
-                    { "id": 17, "audio": "audio/absurdism_s17.mp3", "en": "Most notably, absurdism spawned the Theatre of the Absurd, probably the only theatrical movement inspired by philosophy.", "cn": "最值得注意的是,荒诞主义催⽣了\"荒诞派戏剧\",这可能是唯⼀受到哲学启发的戏剧运动." },
-                    { "id": 18, "audio": "audio/absurdism_s18.mp3", "en": "The Theatre of the Absurd gave us the French writer, Eugène Ionesco, whose play Rhinoceros was about the dangers of conformity and featured a lot of rhinoceroses.", "cn": "\"荒诞派戏剧\"让我们认识了法国作家欧仁·尤内斯库,他的戏剧《犀⽜》讲的是循规蹈矩的危险,其特点是⾥⾯有很多犀⽜." },
-                    { "id": 19, "audio": "audio/absurdism_s19.mp3", "en": "The Irish genius, Samuel Beckett, whose work is less rhinoceros-based, and the British writer NF Simpson, who wasn't really an absurdist at all but is very, very funny indeed, especially in his absurd masterpiece, A Resounding Tinkle.", "cn": "还让我们认识了爱尔兰天才塞缪尔·⻉克特,他的作品相⽐前⼀位没有那么以犀⽜为基础创作内核;以及英国作家纳夫·⾟普森,则根本就不是⼀个真正的荒谬主义者,但确实⾮常⾮常有趣,特别是在他的荒诞派代表作《响亮的叮当声》中显现的淋漓尽致." },
-                    { "id": 20, "audio": "audio/absurdism_s20.mp3", "en": "Beckett, by the way, could also be very serious, and as in Ionesco, the critic, Kenneth Tynan, famously once said, \"Once you have seen all of Ionesco's plays, you have seen one of them.\"", "cn": "顺便说⼀句,⻉克特也可以写⾮常严肃的⽂学作品,⽽在尤内斯库的作品中,评论家肯尼思·泰南曾有句名⾔：“⼀旦你看过尤内斯库所有的戏剧,你就会发现你只看了其中⼀部.”" },
-                    { "id": 21, "audio": "audio/absurdism_s21.mp3", "en": "Which is absurd, but true. Just like absurdism.", "cn": "这听起来很荒谬,但却是事实.就像荒诞主义⼀样." },
-                    { "id": 22, "audio": "audio/absurdism_s22.mp3", "en": "Absurdism suits comedy in fact because the best comedy is essentially absurdist—and perhaps this is why absurdism will never really go away.", "cn": "荒诞主义实际上很适合喜剧，因为最好的喜剧本质上就是荒诞的——或许这就是为什么荒诞主义永远不会真正消失的原因。" }
-                  ]
-                }
-              ],
-              "translation": [
-                {
-                  "id": 1,
-                  "title": "Absurdism: Why Life Is Meaningless According to Absurdists",
-                  "pdf": "files/absurdism_text.pdf",
-                  "pairs": [
-                    { "id": 1, "cn": "从 A 到 Z 的主义.荒诞主义.", "en": "The A to Z of-isms. Absurdism." },
-                    { "id": 2, "cn": "⼤多数哲学主义都在试图理解这个世界.", "en": "Most philosophical-isms are attempts to make sense of the world." },
-                    { "id": 3, "cn": "我们是谁？为什么是我们？有什么意义？等等诸如此类.", "en": "Who are we? Why are we? What's the point? And so on." },
-                    { "id": 4, "cn": "但是,有⼀个哲学主义在这个问题上⼀点时间也不浪费.它叫做荒诞主义.", "en": "But one-ism wastes no time on this topic at all. It's called absurdism." },
-                    { "id": 5, "cn": "在回答\"⽣命的意义是什么？\"这个问题时.荒诞主义会表示,什么都没有.没有什么意义.没有什么重点.没什么好担⼼的.", "en": "In answer to the question, \"What is the meaning of life?\" Absurdism says, there isn't any. No meaning. No point. No worries." },
-                    { "id": 6, "cn": "⽣活是没有意义的.存在是没有⽬的的,看看在这个锅⾥我有多少豌⾖.", "en": "Life is pointless. Existence is meaningless, and look how many peas I have in this pan." },
-                    { "id": 7, "cn": "荒诞主义的开创者,丹⻨哲学家索伦·克尔凯郭尔说,\"鉴于上帝的真实性已经超出了⼈类的理解,那么于⼈类⽽⾔信仰上帝简直是荒谬.\"", "en": "Absurdism was pioneered by the Danish philosopher, Soren Kierkegaard, who said that, \"As the reality of God is beyond human comprehension, it is absurd for humans to have faith in God.\"" },
-                    { "id": 8, "cn": "早在20世纪,荒谬主义者将上帝的概念完全从等式中移除,选择将意义和⽆意义完全变成⼈类的问题.", "en": "In the 20th Century, absurdists removed the concept of God entirely from the equation, choosing to make meaning and meaninglessness an entirely human issue." },
-                    { "id": 9, "cn": "阿尔⻉·加缪认为,由于⽣命是没有意义的,我们可以有以下两种反应中的⼀种.", "en": "Albert Camus believed that, as life is meaningless, we can have one of two responses." },
-                    { "id": 10, "cn": "我们可以结束这⼀切,也可以找到⾃⼰的意义.这都⽆所谓.", "en": "We can end it all or we can find our own meaning. It doesn't matter." },
-                    { "id": 11, "cn": "你可以像他笔下的⼀个⻆⾊那样,⼀辈⼦的时间都⽤来把豌⾖从⼀个锅⾥转移到另⼀个锅⾥.或者你可以从⼀座桥上跳下去.都没什么差别.", "en": "You can, as one of his characters does, spend your life transferring peas from one pan to another. Or you can jump off a bridge. It's all the same thing." },
-                    { "id": 12, "cn": "荒诞主义者说,⽣活是荒谬的.", "en": "Life is absurd, say the absurdists." },
-                    { "id": 13, "cn": "没有上帝,所以没有意义.", "en": "There is no God, so there is no point." },
-                    { "id": 14, "cn": "但他们接着会说,\"没关系\".", "en": "But they go on to say, \"that's fine.\"" },
-                    { "id": 15, "cn": "荒诞主义是对艺术⼀直都有很强影响的⼀种主义.", "en": "Absurdism is an-ism whose influence has been strong in the arts." },
-                    { "id": 16, "cn": "\"没有什么是有意义的\"这⼀观点是⼀种思想解放,尤其是在⽂学和戏剧等传统上都是关于寻找意义的领域.", "en": "The idea that nothing has meaning is a liberating one, particularly in areas like literature and drama which have traditionally been all about the search for meaning." },
-                    { "id": 17, "cn": "最值得注意的是,荒诞主义催⽣了\"荒诞派戏剧\",这可能是唯⼀受到哲学启发的戏剧运动.", "en": "Most notably, absurdism spawned the Theatre of the Absurd, probably the only theatrical movement inspired by philosophy." },
-                    { "id": 18, "cn": "\"荒诞派戏剧\"让我们认识了法国作家欧仁·尤内斯库,他的戏剧《犀⽜》讲的是循规蹈矩的危险,其特点是⾥⾯有很多犀⽜.", "en": "The Theatre of the Absurd gave us the French writer, Eugène Ionesco, whose play Rhinoceros was about the dangers of conformity and featured a lot of rhinoceroses." },
-                    { "id": 19, "cn": "还让我们认识了爱尔兰天才塞缪尔·⻉克特,他的作品相⽐前⼀位没有那么以犀⽜为基础创作内核;以及英国作家纳夫·⾟普森,则根本就不是⼀个真正的荒谬主义者,但确实⾮常⾮常有趣,特别是在他的荒诞派代表作《响亮的叮当声》中显现的淋漓尽致.", "en": "The Irish genius, Samuel Beckett, whose work is less rhinoceros-based, and the British writer NF Simpson, who wasn't really an absurdist at all but is very, very funny indeed, especially in his absurd masterpiece, A Resounding Tinkle." },
-                    { "id": 20, "cn": "顺便说⼀句,⻉克特也可以写⾮常严肃的⽂学作品,⽽在尤内斯库的作品中,评论家肯尼思·泰南曾有句名⾔：“⼀旦你看过尤内斯库所有的戏剧,你就会发现你只看了其中⼀部.”", "en": "Beckett, by the way, could also be very serious, and as in Ionesco, the critic, Kenneth Tynan, famously once said, \"Once you have seen all of Ionesco's plays, you have seen one of them.\"" },
-                    { "id": 21, "cn": "这听起来很荒谬,但却是事实.就像荒诞主义⼀样.", "en": "Which is absurd, but true. Just like absurdism." },
-                    { "id": 22, "cn": "荒诞主义实际上很适合喜剧，因为最好的喜剧本质上就是荒诞的——或许这就是为什么荒诞主义永远不会真正消失的原因。", "en": "Absurdism suits comedy in fact because the best comedy is essentially absurdist—and perhaps this is why absurdism will never really go away." }
-                  ]
-                }
-              ]
-            };
-            // ---------------------
-
+            // 使用 fetch API 从服务器获取 data.json 文件
+            const response = await fetch('data.json');
+            // 如果网络请求失败，则抛出错误
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // 将返回的 JSON 文本解析为 JavaScript 对象
+            appData = await response.json();
+            
+            // 数据加载成功后，才初始化下拉菜单
             initMenus();
         } catch (e) {
             console.error("Data loading failed:", e);
-            alert("数据加载失败，请检查数据格式或文件路径。");
+            alert("课程数据加载失败，请检查 data.json 文件是否存在或格式是否正确。");
         }
     };
 
@@ -426,7 +361,7 @@
         const original = currentDictation.sentences[idx].en;
         const resultDiv = document.getElementById(`d-result-${idx}`);
         
-        userDictationInputs[idx] = input; // 保存
+        userDictationInputs[idx] = input;
 
         if (!input) return alert("请先输入内容");
 
@@ -482,11 +417,15 @@
     }
 
     function openPdfModal() {
-        if (!currentTrans || !currentTrans.pdf) return alert("请先选择语料，或该语料未配置 PDF。");
-        document.getElementById('pdf-iframe').src = currentTrans.pdf;
-        document.getElementById('pdf-download-link').href = currentTrans.pdf;
+        if (!currentTrans) return alert("请先选择语料。");
+
+        const pdfData = currentTrans.pdfBase64 || currentTrans.pdf;
+        if (!pdfData) return alert("该语料未配置 PDF。");
+
+        document.getElementById('pdf-iframe').src = pdfData;
+        document.getElementById('pdf-download-link').href = pdfData;
         document.getElementById('pdfModal').style.display = 'block';
-        document.body.style.overflow = 'hidden'; // 禁止背景滚动
+        document.body.style.overflow = 'hidden';
     }
 
     function closePdfModal() {
@@ -495,7 +434,6 @@
         document.body.style.overflow = 'auto';
     }
 
-    // 点击模态框外部关闭
     window.onclick = function(event) {
         const modal = document.getElementById('pdfModal');
         if (event.target == modal) closePdfModal();
@@ -513,10 +451,10 @@
         userTransInputs = {};
         document.getElementById('trans-workspace').style.display = 'block';
 
-        pairs.forEach((p, index) => { // Added index here
+        pairs.forEach((p, index) => {
             const html = `
                 <div class="card">
-                    <div style="font-size:1.1rem; font-weight:bold; margin-bottom:10px;">${index + 1}. ${p.cn}</div> <!-- Added index + 1 -->
+                    <div style="font-size:1.1rem; font-weight:bold; margin-bottom:10px;">${index + 1}. ${p.cn}</div>
                     <textarea id="t-input-${p.id}" rows="3" placeholder="请输入英文翻译..."></textarea>
                     <div style="text-align:right;">
                         <button class="btn btn-check" onclick="checkTranslation(${p.id}, '${p.en.replace(/'/g, "\\'")}')">✅ 提交检查</button>
